@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
 import Button from '../ui/Button';
@@ -16,9 +17,8 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
     const [chat, setChat] = useState<Chat | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState('');
-    const [isLoading, setIsLoading] = useState(false); // For message sending
+    const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const isInitializing = useRef(false);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -26,21 +26,10 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
 
     useEffect(scrollToBottom, [messages]);
 
-    const initializeChat = useCallback(async (skipKeyCheck = false) => {
-        if (isInitializing.current) return;
-        isInitializing.current = true;
+    const initializeChat = useCallback(async () => {
         setApiKeyStatus('checking');
-
         try {
-            if (!skipKeyCheck) {
-                const hasKey = await window.aistudio.hasSelectedApiKey();
-                if (!hasKey) {
-                    setApiKeyStatus('missing');
-                    isInitializing.current = false;
-                    return;
-                }
-            }
-            
+            // Re-create the AI instance right before use to ensure it has the latest key.
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const newChat = ai.chats.create({
                 model: 'gemini-2.5-flash',
@@ -57,25 +46,40 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
             setApiKeyStatus('missing');
             setMessages([]);
             setChat(null);
-        } finally {
-            isInitializing.current = false;
         }
     }, []);
 
-    useEffect(() => {
-        // On initial load, perform the key check.
-        initializeChat(false);
+    const checkForKeyAndInitialize = useCallback(async () => {
+        try {
+            const hasKey = await window.aistudio.hasSelectedApiKey();
+            if (hasKey) {
+                await initializeChat();
+            } else {
+                setApiKeyStatus('missing');
+            }
+        } catch (error) {
+             console.error("Error checking for API key:", error);
+             setApiKeyStatus('missing');
+        }
     }, [initializeChat]);
+
+
+    useEffect(() => {
+        checkForKeyAndInitialize();
+    }, [checkForKeyAndInitialize]);
 
     const handleSelectKey = async () => {
         try {
             await window.aistudio.openSelectKey();
-            // After the dialog closes, we assume the user selected a key.
-            // We skip the `hasSelectedApiKey` check to avoid the race condition.
-            initializeChat(true);
+            // Per documentation, to avoid race conditions, we assume the key is selected
+            // and proceed directly to initialization without re-checking.
+            await initializeChat();
         } catch (error) {
             console.error('API key selection dialog was cancelled or failed.', error);
-            setApiKeyStatus('missing');
+            // If the dialog itself fails, we ensure the status is 'missing'.
+            if (apiKeyStatus !== 'missing') {
+                setApiKeyStatus('missing');
+            }
         }
     };
 
@@ -97,17 +101,16 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
                 const chunkText = chunk.text;
                 setMessages(prev => {
                     const newMessages = [...prev];
-                    const lastMessageIndex = newMessages.length - 1;
-                    const updatedLastMessage = {
-                        ...newMessages[lastMessageIndex],
-                        content: newMessages[lastMessageIndex].content + chunkText,
-                    };
-                    newMessages[lastMessageIndex] = updatedLastMessage;
+                    const lastMessage = newMessages[newMessages.length - 1];
+                    if (lastMessage && lastMessage.role === 'model') {
+                        lastMessage.content += chunkText;
+                    }
                     return newMessages;
                 });
             }
         } catch (error: any) {
             console.error("Error sending message:", error);
+            const errorMessage = 'Oops! Something went wrong. Please try again.';
             if (error.message && error.message.includes('Requested entity was not found')) {
                  setApiKeyStatus('missing');
                  setMessages([]);
@@ -115,15 +118,12 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
             } else {
                 setMessages(prev => {
                     const newMessages = [...prev];
-                    const lastMessageIndex = newMessages.length - 1;
-                    if(newMessages[lastMessageIndex]?.role === 'model') {
-                        const updatedLastMessage = {
-                          ...newMessages[lastMessageIndex],
-                          content: 'Oops! Something went wrong. Please try again.'
-                        };
-                        newMessages[lastMessageIndex] = updatedLastMessage;
+                    const lastMessage = newMessages[newMessages.length - 1];
+                    if (lastMessage && lastMessage.role === 'model' && lastMessage.content === '') {
+                        lastMessage.content = errorMessage;
+                        return newMessages;
                     }
-                    return newMessages;
+                    return [...newMessages, {role: 'model', content: errorMessage}];
                 });
             }
         } finally {
