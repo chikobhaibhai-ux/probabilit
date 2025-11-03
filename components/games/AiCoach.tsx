@@ -26,13 +26,13 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
 
     useEffect(scrollToBottom, [messages]);
 
-    const checkAndInitialize = useCallback(async () => {
+    const initializeChat = useCallback(async (skipKeyCheck = false) => {
         if (isInitializing.current) return;
         isInitializing.current = true;
         setApiKeyStatus('checking');
 
         try {
-            const hasKey = await window.aistudio.hasSelectedApiKey();
+            const hasKey = skipKeyCheck || await window.aistudio.hasSelectedApiKey();
             if (!hasKey) {
                 setApiKeyStatus('missing');
                 isInitializing.current = false;
@@ -61,13 +61,14 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
     }, []);
 
     useEffect(() => {
-        checkAndInitialize();
-    }, [checkAndInitialize]);
+        initializeChat(false);
+    }, [initializeChat]);
 
     const handleSelectKey = async () => {
         try {
             await window.aistudio.openSelectKey();
-            await checkAndInitialize();
+            // After selection, assume success and skip the potentially slow key check
+            await initializeChat(true);
         } catch (error) {
             console.error('API key selection dialog was cancelled or failed.', error);
         }
