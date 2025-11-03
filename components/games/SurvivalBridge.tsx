@@ -145,14 +145,14 @@ const SurvivalBridge: React.FC<SurvivalBridgeProps> = ({ goBack, updatePoints, e
                     <div className="text-center">
                         {result.success ? (
                              <>
-                                <span className="text-7xl block mb-4">🎉</span>
+                                <span className="text-7xl block mb-4 animate-pulse-once">🎉</span>
                                 <h3 className="text-3xl font-bold text-green-600">Success!</h3>
                                 <p className="text-lg mt-2">All <strong>{result.count}</strong> adventurers made it across safely.</p>
                                 <p className="text-gray-600 mt-1">You earned {result.points} Probability Points!</p>
                             </>
                         ) : (
                              <>
-                                <span className="text-7xl block mb-4">💥</span>
+                                <span className="text-7xl block mb-4 animate-shake">💥</span>
                                 <h3 className="text-3xl font-bold text-red-600">Disaster!</h3>
                                 <p className="text-lg mt-2">The bridge collapsed! All <strong>{result.count}</strong> adventurers were lost.</p>
                                 <p className="text-gray-600 mt-1">You lost {Math.abs(result.points)} Probability Points.</p>

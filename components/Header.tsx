@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BadgeType } from '../types';
 import { BADGE_DEFINITIONS } from '../constants';
 
@@ -9,6 +8,18 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ points, badges }) => {
+  const [isPointsAnimating, setIsPointsAnimating] = useState(false);
+  const prevPointsRef = useRef(points);
+
+  useEffect(() => {
+    if (points !== prevPointsRef.current) {
+      setIsPointsAnimating(true);
+      const timer = setTimeout(() => setIsPointsAnimating(false), 600); // Animation duration
+      prevPointsRef.current = points;
+      return () => clearTimeout(timer);
+    }
+  }, [points]);
+
   return (
     <header className="bg-white shadow-md sticky top-0 z-10">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -28,7 +39,7 @@ const Header: React.FC<HeaderProps> = ({ points, badges }) => {
                 </div>
               ))}
             </div>
-            <div className="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-full">
+            <div className={`bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-full transition-all ${isPointsAnimating ? 'animate-pulse-once' : ''}`}>
               {points.toLocaleString()} PP
             </div>
           </div>

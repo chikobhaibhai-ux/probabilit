@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { LuckyBox, LuckyBoxItem, BadgeType } from '../../types';
 import { LUCKY_BOXES } from '../../constants';
@@ -99,7 +98,7 @@ const LuckyBoxShop: React.FC<LuckyBoxShopProps> = ({ goBack, currentPoints, upda
         <Modal isOpen={showActivityResult} onClose={() => setShowActivityResult(false)} title="You got...">
             {result && (
                 <div className="text-center">
-                    <h3 className={`text-3xl font-bold ${getRarityColor(result.rarity)}`}>{result.name}</h3>
+                    <h3 className={`text-3xl font-bold ${getRarityColor(result.rarity)} animate-pulse-once`}>{result.name}</h3>
                     <p className="text-gray-600">Value: {result.value} PP</p>
                     <p className={`mt-2 text-sm font-semibold ${getRarityColor(result.rarity)}`}>({result.rarity.toUpperCase()})</p>
                 </div>

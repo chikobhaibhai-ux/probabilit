@@ -1,17 +1,19 @@
-
 import React from 'react';
 import { GameCardInfo } from '../types';
 
 interface GameCardProps {
   game: GameCardInfo;
   onClick: () => void;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
-const GameCard: React.FC<GameCardProps> = ({ game, onClick }) => {
+const GameCard: React.FC<GameCardProps> = ({ game, onClick, className = '', style }) => {
   return (
     <div 
       onClick={onClick}
-      className={`p-6 rounded-xl shadow-lg cursor-pointer transform hover:scale-105 transition-transform duration-300 flex flex-col justify-between bg-gradient-to-br ${game.color}`}
+      className={`p-6 rounded-xl shadow-lg cursor-pointer transform hover:scale-105 transition-transform duration-300 flex flex-col justify-between bg-gradient-to-br ${game.color} ${className}`}
+      style={style}
     >
       <div>
         <div className="flex items-center justify-between mb-4">

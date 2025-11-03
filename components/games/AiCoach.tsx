@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
 import Button from '../ui/Button';
@@ -31,7 +30,7 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
             const newChat = ai.chats.create({
                 model: 'gemini-2.5-flash',
                 config: {
-                    systemInstruction: "You are a friendly and encouraging probability coach named 'Pro-Bot'. Your goal is to explain probability concepts to middle school students in a simple, fun, and engaging way. Use analogies, simple examples, and avoid overly technical jargon. When asked for a problem, create a short, clear problem with a multiple-choice answer, and then explain the solution step-by-step after the user has had a chance to think. Keep your responses concise and easy to read.",
+                    systemInstruction: "You are a friendly and encouraging probability coach named 'Pro-Bot'. Your goal is to explain probability concepts to middle school students in a simple, fun, and engaging way. Use analogies, simple examples, and avoid overly technical jargon. When asked for a problem, create a short, clear problem with a multiple-choice answer, and then explain the solution step-by-step after the user has had a chance to think. Keep your responses concise and easy to read. Use markdown for lists and bolding.",
                 },
             });
             setChat(newChat);
@@ -48,18 +47,31 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
 
         const userMessageContent = inputValue;
         const userMessage: Message = { role: 'user', content: userMessageContent };
-        setMessages(prev => [...prev, userMessage]);
+        
+        setMessages(prev => [...prev, userMessage, { role: 'model', content: '' }]);
         setInputValue('');
         setIsLoading(true);
 
         try {
-            const response = await chat.sendMessage({ message: userMessageContent });
-            const modelResponse: Message = { role: 'model', content: response.text };
-            setMessages(prev => [...prev, modelResponse]);
+            const stream = await chat.sendMessageStream({ message: userMessageContent });
+            
+            for await (const chunk of stream) {
+                const chunkText = chunk.text;
+                setMessages(prev => {
+                    const newMessages = [...prev];
+                    const lastMessage = newMessages[newMessages.length - 1];
+                    lastMessage.content += chunkText;
+                    return newMessages;
+                });
+            }
+
         } catch (error) {
             console.error("Error sending message:", error);
-            const errorMessage: Message = { role: 'model', content: 'Oops! Something went wrong. Please try again.' };
-            setMessages(prev => [...prev, errorMessage]);
+            setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1].content = 'Oops! Something went wrong. Please try again.';
+                return newMessages;
+            });
         } finally {
             setIsLoading(false);
         }
@@ -80,22 +92,11 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
                         <div key={index} className={`flex items-start gap-3 my-4 ${msg.role === 'user' ? 'justify-end' : ''}`}>
                              {msg.role === 'model' && <span className="text-2xl flex-shrink-0">🤖</span>}
                             <div className={`p-3 rounded-lg max-w-lg ${msg.role === 'user' ? 'bg-indigo-500 text-white' : 'bg-gray-200 text-gray-800'}`}>
-                                <p style={{whiteSpace: 'pre-wrap'}}>{msg.content}</p>
+                                <div className="prose">{msg.content}</div>
+                                {isLoading && msg.role === 'model' && index === messages.length -1 && <span className="inline-block w-2 h-4 bg-gray-600 animate-pulse ml-1"></span>}
                             </div>
                         </div>
                     ))}
-                    {isLoading && (
-                        <div className="flex items-start gap-3 my-4">
-                            <span className="text-2xl">🤖</span>
-                            <div className="p-3 rounded-lg bg-gray-200 text-gray-800">
-                                <div className="flex items-center space-x-2">
-                                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse"></div>
-                                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse [animation-delay:0.2s]"></div>
-                                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse [animation-delay:0.4s]"></div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                     <div ref={messagesEndRef} />
                 </div>
 
