@@ -15,7 +15,7 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
     const [chat, setChat] = useState<Chat | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -25,8 +25,19 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
     useEffect(scrollToBottom, [messages]);
 
     useEffect(() => {
+        // Vercel deployment requires environment variables to be explicitly set.
+        // This check helps diagnose deployment issues.
+        if (!process.env.API_KEY) {
+            setMessages([{ 
+                role: 'model', 
+                content: "The AI Coach is currently unavailable. \n\nIt seems the API Key is not configured in the deployment environment. Please ensure the `API_KEY` environment variable is set correctly in your Vercel project settings." 
+            }]);
+            setIsLoading(false);
+            return;
+        }
+        
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const newChat = ai.chats.create({
                 model: 'gemini-2.5-flash',
                 config: {
@@ -38,6 +49,8 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
         } catch (error) {
             console.error("Failed to initialize AI Chat:", error);
             setMessages([{ role: 'model', content: "Sorry, I'm having trouble connecting right now. Please try again later." }]);
+        } finally {
+            setIsLoading(false);
         }
     }, []);
 
@@ -107,7 +120,7 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
                             type="text"
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
-                            placeholder={chat ? "Ask a probability question..." : "Initializing AI..."}
+                            placeholder={chat ? "Ask a probability question..." : "AI is not available"}
                             className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             disabled={!chat || isLoading}
                             aria-label="Chat input"

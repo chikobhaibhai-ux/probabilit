@@ -162,11 +162,14 @@ const FindTheThief: React.FC<FindTheThiefProps> = ({ goBack, updatePoints, earnB
     return (
         <div className="container mx-auto">
             <div className="flex justify-between items-center mb-8">
-                <Button onClick={gameState === 'intro' ? goBack : startGame} variant="secondary">
-                    {gameState === 'intro' ? '← Back to Games' : '↩ New Game'}
-                </Button>
+                <Button onClick={goBack} variant="secondary">← Back to Games</Button>
                 <h1 className="text-4xl font-bold text-center text-blue-500">Find the Thief</h1>
-                <Button onClick={() => setShowLearnMode(true)} variant="ghost">🎓 Learn Mode</Button>
+                <div className="flex items-center space-x-2">
+                    <Button onClick={() => setShowLearnMode(true)} variant="ghost">🎓 Learn Mode</Button>
+                    {gameState !== 'intro' && (
+                        <Button onClick={startGame} variant="ghost" title="Start a New Game">↩ New Game</Button>
+                    )}
+                </div>
             </div>
 
             {gameState === 'intro' && renderIntro()}
