@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
 import Button from '../ui/Button';
@@ -53,10 +54,8 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
 
     const initializeChat = useCallback(async () => {
         setIsInitializing(true);
-        setKeyError(null);
 
         try {
-            // A new instance is created to ensure the latest key is used.
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const newChat = ai.chats.create({
                 model: 'gemini-2.5-flash',
@@ -99,44 +98,39 @@ STYLE & BEHAVIOR:
         } catch (error: any) {
             console.error("Failed to initialize AI Chat:", error);
             setChat(null);
-            if (window.aistudio) {
-                setKeyStatus('needed'); 
-                if (error.message.includes('API key not valid') || error.message.includes('permission') || error.message.includes('not found')) {
-                    setKeyError('The selected API key is not valid or lacks permissions. Please choose a different key.');
-                } else {
-                    setKeyError('An unexpected error occurred during initialization. Please try selecting your key again.');
-                }
-            } else {
-                setMessages([{
-                    role: 'model',
-                    content: "Sorry, the AI Coach couldn't be started. This might be because an API key isn't configured for this environment."
-                }]);
-            }
+            // Display a clear error message inside the chat window. This is the definitive fix.
+            setMessages([{
+                role: 'model',
+                content: "Sorry, the AI Coach couldn't be started. The provided API key appears to be invalid or lacks permissions. Please check your key configuration and reload."
+            }]);
         } finally {
             setIsInitializing(false);
         }
     }, []);
     
     useEffect(() => {
-        const checkKeyManagementService = async () => {
-            await new Promise(resolve => setTimeout(resolve, 500));
+        const checkKeyAvailability = async () => {
+            await new Promise(resolve => setTimeout(resolve, 100)); // Short delay for aistudio
             if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
                 try {
-                    if (await window.aistudio.hasSelectedApiKey()) {
-                        setKeyStatus('ready');
-                    } else {
-                        setKeyStatus('needed');
-                    }
+                    const hasKey = await window.aistudio.hasSelectedApiKey();
+                    setKeyStatus(hasKey ? 'ready' : 'needed');
                 } catch (e) {
-                    console.error("Error checking aistudio API key:", e);
                     setKeyStatus('error');
-                    setKeyError('Could not connect to the API key service. Please reload.');
+                    setKeyError('Could not connect to the API key service.');
                 }
             } else {
-                setKeyStatus('ready'); 
+                // Local dev fallback
+                if (process.env.API_KEY) {
+                    setKeyStatus('ready');
+                } else {
+                    // No aistudio, no env key. This is a fatal configuration error.
+                    setKeyStatus('error'); 
+                    setKeyError("Sorry, the AI Coach couldn't be started. An API key isn't configured for this environment.");
+                }
             }
         };
-        checkKeyManagementService();
+        checkKeyAvailability();
     }, []);
 
 
@@ -147,9 +141,11 @@ STYLE & BEHAVIOR:
     }, [keyStatus, chat, isInitializing, initializeChat]);
 
     const handleSelectKey = async () => {
+        if (!window.aistudio) return;
         try {
             await window.aistudio.openSelectKey();
             setKeyStatus('ready');
+            setKeyError(null); // Clear previous errors
         } catch (e) {
             console.error("Could not open API key dialog:", e);
             setKeyError('The API key selection dialog could not be opened.');
@@ -164,7 +160,6 @@ STYLE & BEHAVIOR:
         const userMessage: Message = { role: 'user', content: inputValue };
         setMessages(prev => [...prev, userMessage, { role: 'model', content: '' }]);
         
-        // Prepend voice command to the user's message
         const voiceCommand = isMadScientistVoiceOn ? "Mad Scientist Voice: ON" : "Mad Scientist Voice: OFF";
         const messageToSend = `${voiceCommand}\n\n${inputValue}`;
         
@@ -268,7 +263,7 @@ STYLE & BEHAVIOR:
     const renderChatInterface = () => (
          <>
             <div className="flex-1 p-6 overflow-y-auto">
-                {isInitializing ? (
+                {(isInitializing && messages.length === 0) ? (
                     <div className="flex items-center justify-center h-full">
                         <p className="text-gray-500 animate-pulse">Connecting to the AI Coach...</p>
                     </div>
@@ -293,12 +288,12 @@ STYLE & BEHAVIOR:
                         type="text"
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
-                        placeholder={chat && !isInitializing ? "Ask a probability question..." : "AI is not available"}
+                        placeholder={chat ? "Ask a probability question..." : "AI is not available"}
                         className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        disabled={!chat || isStreaming || isInitializing}
+                        disabled={!chat || isStreaming}
                         aria-label="Chat input"
                     />
-                    <Button type="submit" disabled={!chat || isStreaming || !inputValue.trim() || isInitializing}>
+                    <Button type="submit" disabled={!chat || isStreaming || !inputValue.trim()}>
                         Send
                     </Button>
                 </form>
@@ -316,7 +311,12 @@ STYLE & BEHAVIOR:
                 return renderChatInterface();
             case 'error':
             default:
-                return <div className="flex items-center justify-center h-full text-center p-4"><p className="text-red-500">{keyError || 'An unknown error occurred.'}</p></div>;
+                return (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                        <span className="text-4xl mb-4">🚫</span>
+                        <p className="text-red-600 font-semibold">{keyError || 'An unknown error occurred.'}</p>
+                    </div>
+                );
         }
     };
 
