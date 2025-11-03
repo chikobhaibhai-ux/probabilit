@@ -1,3 +1,4 @@
+
 import { Game, GameCardInfo, LuckyBox, BadgeType, GameCase, GoalTarget } from './types';
 
 export const GAME_CARDS: GameCardInfo[] = [
@@ -32,6 +33,14 @@ export const GAME_CARDS: GameCardInfo[] = [
     icon: '⚽',
     color: 'from-red-400 to-pink-500',
     concept: 'Success Probability',
+  },
+  {
+    id: Game.AiCoach,
+    title: 'AI Probability Coach',
+    description: 'Ask "Pro-Bot" any question about probability and get instant, helpful answers!',
+    icon: '🤖',
+    color: 'from-purple-400 to-violet-500',
+    concept: 'AI Tutoring',
   },
 ];
 

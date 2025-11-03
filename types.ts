@@ -1,8 +1,10 @@
+
 export enum Game {
   LuckyBox = 'Lucky Box Shop',
   FindTheThief = 'Find the Thief',
   SurvivalBridge = 'Survival Bridge',
   GoalOrMiss = 'Goal or Miss',
+  AiCoach = 'AI Probability Coach',
 }
 
 export enum BadgeType {
