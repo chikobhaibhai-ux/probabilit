@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
 import Button from '../ui/Button';
@@ -33,7 +32,6 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
     const initializeChat = useCallback(async () => {
         setIsInitializing(true);
         setKeyError(null);
-        setMessages([]);
 
         try {
             // A new instance is created to ensure the latest key is used.
@@ -50,11 +48,20 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
         } catch (error: any) {
             console.error("Failed to initialize AI Chat:", error);
             setChat(null);
-            setKeyStatus('needed'); // Allow user to try again
-            if (error.message.includes('API key not valid') || error.message.includes('permission') || error.message.includes('not found')) {
-                setKeyError('The selected API key is not valid or lacks permissions. Please choose a different key.');
+            // Check if aistudio exists to provide context-aware error messages
+            if (window.aistudio) {
+                setKeyStatus('needed'); // Re-prompt for key
+                if (error.message.includes('API key not valid') || error.message.includes('permission') || error.message.includes('not found')) {
+                    setKeyError('The selected API key is not valid or lacks permissions. Please choose a different key.');
+                } else {
+                    setKeyError('An unexpected error occurred during initialization. Please try selecting your key again.');
+                }
             } else {
-                setKeyError('An unexpected error occurred during initialization. Please try selecting your key again.');
+                // aistudio not present, show error inline within the chat UI
+                setMessages([{
+                    role: 'model',
+                    content: "Sorry, the AI Coach couldn't be started. This might be because an API key isn't configured for this environment."
+                }]);
             }
         } finally {
             setIsInitializing(false);
@@ -62,38 +69,31 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
     }, []);
     
     useEffect(() => {
-        const checkApiKey = async () => {
-            setKeyStatus('checking');
-            setKeyError(null);
+        const checkKeyManagementService = async () => {
+            // Give the aistudio SDK a moment to load to handle race conditions
+            await new Promise(resolve => setTimeout(resolve, 500));
 
-            // Poll for the aistudio SDK to ensure it's loaded.
-            let attempts = 0;
-            const maxAttempts = 50; // Try for 5 seconds
-            while (!window.aistudio && attempts < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-                attempts++;
-            }
-
-            if (!window.aistudio || typeof window.aistudio.hasSelectedApiKey !== 'function') {
-                console.error('AI Studio SDK not found or is invalid after waiting.');
-                setKeyStatus('error');
-                setKeyError('Could not connect to the API key service. Please reload the page to try again.');
-                return;
-            }
-
-            try {
-                if (await window.aistudio.hasSelectedApiKey()) {
-                    setKeyStatus('ready');
-                } else {
-                    setKeyStatus('needed');
+            if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+                // aistudio SDK is present, use its flow
+                try {
+                    if (await window.aistudio.hasSelectedApiKey()) {
+                        setKeyStatus('ready');
+                    } else {
+                        setKeyStatus('needed');
+                    }
+                } catch (e) {
+                    console.error("Error checking aistudio API key:", e);
+                    setKeyStatus('error');
+                    setKeyError('Could not connect to the API key service. Please reload.');
                 }
-            } catch (e) {
-                console.error("Error during hasSelectedApiKey check:", e);
-                setKeyStatus('error');
-                setKeyError('Could not check for an API key. Please try reloading.');
+            } else {
+                // aistudio SDK is not present, fall back to environment variable.
+                // We assume the key is present and just try to initialize.
+                setKeyStatus('ready'); 
             }
         };
-        checkApiKey();
+
+        checkKeyManagementService();
     }, []);
 
 
@@ -185,7 +185,7 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
                         <div key={index} className={`flex items-start gap-3 my-4 ${msg.role === 'user' ? 'justify-end' : ''}`}>
                             {msg.role === 'model' && <span className="text-2xl flex-shrink-0">🤖</span>}
                             <div className={`p-3 rounded-lg max-w-lg ${msg.role === 'user' ? 'bg-indigo-500 text-white' : 'bg-gray-200 text-gray-800'}`}>
-                                <div className="prose">{msg.content}</div>
+                                <div className="prose" dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, '<br />') }}></div>
                                 {isStreaming && msg.role === 'model' && index === messages.length - 1 && (
                                     <span className="inline-block w-2 h-4 bg-gray-600 animate-pulse ml-1"></span>
                                 )}
@@ -201,7 +201,7 @@ const AiCoach: React.FC<AiCoachProps> = ({ goBack }) => {
                         type="text"
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
-                        placeholder={chat && !isInitializing ? "Ask a probability question..." : "AI Coach is unavailable"}
+                        placeholder={chat && !isInitializing ? "Ask a probability question..." : "AI is not available"}
                         className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         disabled={!chat || isStreaming || isInitializing}
                         aria-label="Chat input"
