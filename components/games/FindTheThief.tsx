@@ -65,28 +65,25 @@ const FindTheThief: React.FC<FindTheThiefProps> = ({ goBack, updatePoints, earnB
         setRevealedClues(prev => [...prev, nextClue]);
 
         setSuspects(prevSuspects => {
-            // Find suspects who match the new clue
-            const matchingSuspects = prevSuspects.filter(s => {
-                const suspectValue = s.attributes[nextClue.attribute];
-                return suspectValue === nextClue.expectedValue;
+            // Identify suspects who were possible before this clue and also match this clue.
+            const stillViableSuspects = prevSuspects.filter(s => {
+                return s.probability > 0 && s.attributes[nextClue.attribute] === nextClue.expectedValue;
             });
-            
-            // Calculate the total probability of all matching suspects before this update
-            const totalMatchingProb = matchingSuspects.reduce((sum, s) => sum + s.probability, 0);
 
-            // If no suspects match (which shouldn't happen with correct clues), do nothing
-            if (totalMatchingProb === 0) return prevSuspects; 
+            // If no suspects match (which shouldn't happen), don't change anything.
+            if (stillViableSuspects.length === 0) return prevSuspects;
 
-            // Update probabilities using Bayes' theorem concept
+            // The new probability is evenly distributed among the remaining suspects.
+            const newProb = 1 / stillViableSuspects.length;
+            const viableIds = new Set(stillViableSuspects.map(s => s.id));
+
+            // Update state: viable suspects get the new probability, everyone else gets 0.
             return prevSuspects.map(s => {
-                const matches = s.attributes[nextClue.attribute] === nextClue.expectedValue;
-                if (matches) {
-                    // This suspect's probability increases
-                    return { ...s, probability: s.probability / totalMatchingProb };
-                } else {
-                    // This suspect is eliminated (probability becomes 0)
-                    return { ...s, probability: 0 };
+                if (viableIds.has(s.id)) {
+                    return { ...s, probability: newProb };
                 }
+                // If the suspect is not in the viable set, they are eliminated.
+                return { ...s, probability: 0 };
             });
         });
     }, [revealedClues, gameClues]);
